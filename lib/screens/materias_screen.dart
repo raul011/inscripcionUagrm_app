@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/materia.dart';
 import '../services/api_service.dart';
 import 'grupo_materias_screen.dart';
+import '../services/session_service.dart';
+import 'login_screen2.dart';
+import 'perfil_estudiante_screen.dart';
+import 'materias-agregadas_screen.dart';
 
 class MateriasScreen extends StatefulWidget {
   const MateriasScreen({super.key});
@@ -31,6 +35,71 @@ class _MateriasScreenState extends State<MateriasScreen> {
         backgroundColor: const Color(0xFF2A2A3E),
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF00D9D9)),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Perfil',
+            onSelected: (value) async {
+              if (value == 'perfil') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PerfilEstudianteScreen(),
+                  ),
+                );
+              } else if (value == 'logout') {
+                // Borrar la sesión
+                await SessionService.borrarRegistro();
+
+                // Navegar a la pantalla de login y eliminar el historial de rutas
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen2(),
+                    ),
+                    (Route<dynamic> route) => false,
+                  );
+                }
+              } else if (value == 'materias') {
+                // Borrar la sesión
+
+                // Navegar a la pantalla de login y eliminar el historial de rutas
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const MateriasAgregadasScreen(),
+                    ),
+                    (Route<dynamic> route) => false,
+                  );
+                }
+              }
+            },
+            itemBuilder:
+                (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'perfil',
+                    child: ListTile(
+                      leading: Icon(Icons.person),
+                      title: Text('Ver Perfil'),
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'logout',
+                    child: ListTile(
+                      leading: Icon(Icons.logout),
+                      title: Text('Cerrar Sesión'),
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'materias',
+                    child: ListTile(
+                      leading: Icon(Icons.logout),
+                      title: Text('materias agregadas'),
+                    ),
+                  ),
+                ],
+          ),
+        ],
       ),
       body: FutureBuilder<List<Materia>>(
         future: materiasFuture,
@@ -82,6 +151,7 @@ class _MateriasScreenState extends State<MateriasScreen> {
           }
 
           final materias = snapshot.data!;
+          // final codMateria = "MAT101";
 
           // Lista de colores alternos para las tarjetas
           final cardColors = [
@@ -104,7 +174,9 @@ class _MateriasScreenState extends State<MateriasScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const CourseGroupsScreen(),
+                      builder:
+                          (context) =>
+                              CourseGroupsScreen(codMat: materia.codigo),
                     ),
                   );
                 },

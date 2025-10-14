@@ -3,6 +3,7 @@ import 'package:inscripcion_app/main.dart';
 import 'package:inscripcion_app/screens/materias_screen.dart';
 import 'package:inscripcion_app/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:inscripcion_app/services/session_service.dart';
 
 class LoginScreen2 extends StatefulWidget {
   const LoginScreen2({super.key});
@@ -49,6 +50,7 @@ class _LoginScreenState2 extends State<LoginScreen2> {
         final payload = _decodeJwt(accessToken);
 
         if (mounted) {
+          await SessionService.guardarRegistro(_registroController.text);
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => MateriasScreen()),

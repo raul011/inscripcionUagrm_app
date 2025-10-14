@@ -3,10 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../models/grupo_materia.dart';
 
 class CourseGroupsScreen extends StatefulWidget {
-  const CourseGroupsScreen({Key? key}) : super(key: key);
+  final String codMat;
+
+  CourseGroupsScreen({super.key, required this.codMat});
 
   @override
   State<CourseGroupsScreen> createState() => _CourseGroupsScreenState();
@@ -19,38 +22,16 @@ class _CourseGroupsScreenState extends State<CourseGroupsScreen> {
   @override
   void initState() {
     super.initState();
-    futureGrupos = apiService.fetchGruposPorMateria("MAT101");
+    futureGrupos = apiService.fetchGruposPorMateria(widget.codMat);
   }
 
   int? loadingIndex;
   String status = 'Sin iniciar';
+  List<GrupoMateriaConStatus> grupos = [];
 
-  List<CourseGroup> groups = [
-    CourseGroup(
-      groupNumber: '101',
-      schedule: 'Lunes y Miércoles 8:00-10:00',
-      professor: 'Dr. García',
-      totalQuota: 30,
-      enrolledStudents: 20,
-      status: GroupStatus.available,
-    ),
-    CourseGroup(
-      groupNumber: '102',
-      schedule: 'Martes y Jueves 14:00-16:00',
-      professor: 'Dra. López',
-      totalQuota: 25,
-      enrolledStudents: 25,
-      status: GroupStatus.full,
-    ),
-    CourseGroup(
-      groupNumber: '103',
-      schedule: 'Viernes 9:00-13:00',
-      professor: 'Prof. Martínez',
-      totalQuota: 35,
-      enrolledStudents: 15,
-      status: GroupStatus.available,
-    ),
-  ];
+  // Variables para guardar información de inscripción
+  int? inscripcionId;
+  String? transactionId;
 
   @override
   Widget build(BuildContext context) {
@@ -64,86 +45,152 @@ class _CourseGroupsScreenState extends State<CourseGroupsScreen> {
         backgroundColor: const Color(0xFF2A2A3E),
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF00D9D9)),
+        actions: [
+          // Botón para consultar estado
+          if (inscripcionId != null)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _consultarEstado,
+              tooltip: 'Consultar estado',
+            ),
+        ],
       ),
-      body: Column(
-        children: [
-          // Estado siempre visible
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A3E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF3A3A4E)),
-              ),
+      body: FutureBuilder<List<GrupoMateria>>(
+        future: futureGrupos,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00D9D9)),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
               child: Text(
-                "Estado: $status",
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
+              child: Text(
+                'No hay grupos disponibles',
+                style: TextStyle(color: Colors.white),
+              ),
+            );
+          }
+
+          if (grupos.isEmpty) {
+            grupos =
+                snapshot.data!
+                    .map((g) => GrupoMateriaConStatus(grupoMateria: g))
+                    .toList();
+          }
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A3E),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF3A3A4E)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Estado: $status",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (inscripcionId != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'ID Inscripción: $inscripcionId',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF8B8B9E),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-          // Lista de grupos
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: groups.length,
-              itemBuilder: (context, index) {
-                final hasSuccessfulEnrollment = groups.any(
-                  (g) => g.status == GroupStatus.success,
-                );
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: grupos.length,
+                  itemBuilder: (context, index) {
+                    final hasSuccessfulEnrollment = grupos.any(
+                      (g) => g.status == GroupStatus.success,
+                    );
 
-                if (hasSuccessfulEnrollment) {
-                  if (groups[index].status != GroupStatus.success) {
-                    return const SizedBox.shrink();
-                  }
-                } else {
-                  if (loadingIndex != null && loadingIndex != index) {
-                    return const SizedBox.shrink();
-                  }
-                }
+                    if (hasSuccessfulEnrollment) {
+                      if (grupos[index].status != GroupStatus.success) {
+                        return const SizedBox.shrink();
+                      }
+                    } else {
+                      if (loadingIndex != null && loadingIndex != index) {
+                        return const SizedBox.shrink();
+                      }
+                    }
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: CourseGroupCard(
-                    group: groups[index],
-                    isLoading: loadingIndex == index,
-                    onEnroll: () => _handleEnroll(index),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: CourseGroupCard(
+                        grupo: grupos[index],
+                        isLoading: loadingIndex == index,
+                        onEnroll: () => _handleEnroll(index),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   Future<void> _handleEnroll(int index) async {
+    final grupoSeleccionado = grupos[index];
     final requestId = const Uuid().v4();
     debugPrint("Request ID generado: $requestId");
 
     setState(() {
       loadingIndex = index;
-      groups[index].status = GroupStatus.pending;
+      grupoSeleccionado.status = GroupStatus.pending;
     });
 
     try {
+      final registroLogeado = await SessionService.obtenerRegistro();
+      debugPrint(
+        "✅-----------------------***** REGISTRO ******-------------------------" +
+            (registroLogeado ?? "No registro"),
+      );
+
       final url = Uri.parse(
-        "http://192.168.0.184:5000/api/inscripciones-sync/async/completa",
+        "http://192.168.0.184:5000/api/inscripciones/async",
       );
 
       final body = {
-        "estudianteRegistro": "20251234",
-        "periodoGestion": "2025-1",
-        "materiaGrupoCodigos": ["MAT101-A", "INF119-B"],
-        "callbackUrl": "http://192.168.0.184:5000/webhook/sink",
+        "registro": registroLogeado,
+        "periodoId": 1,
+        "materias": [
+          //{"materiaCodigo": "LIN100", "grupo": "Z1"},
+          {"materiaCodigo": widget.codMat, "grupo": grupoSeleccionado.grupo},
+        ],
       };
 
       final response = await http.post(
@@ -155,38 +202,47 @@ class _CourseGroupsScreenState extends State<CourseGroupsScreen> {
       if (response.statusCode == 200 || response.statusCode == 202) {
         final data = jsonDecode(response.body);
         final estado = data["estado"];
-        final transaccionId = data["transaccionId"];
+        final transaccionId = data["transactionId"];
+
+        // Guardar el ID de inscripción y transactionId
+        final inscripcionData = data["inscripcion"];
+        inscripcionId = inscripcionData["id"];
+        transactionId = transaccionId;
+
+        debugPrint("Inscripción ID guardado: $inscripcionId");
+        debugPrint("Transaction ID guardado: $transactionId");
 
         setState(() {
-          groups[index].enrolledStudents++;
-          if (groups[index].enrolledStudents >= groups[index].totalQuota) {
-            groups[index].status = GroupStatus.full;
-          } else {
-            groups[index].status = GroupStatus.success;
-          }
+          // Mantener en pending para que el polling actualice el estado
+          grupoSeleccionado.status = GroupStatus.pending;
           loadingIndex = null;
-          status = "✅ Estado: $estado\nTransacción: $transaccionId";
+          status =
+              "⏳ Estado: $estado\nTransacción: $transaccionId\nID: $inscripcionId";
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Inscrito en Grupo ${groups[index].groupNumber}\n'
+              'Inscrito en Grupo ${grupoSeleccionado.grupo}\n'
               'Estado: $estado\n'
-              'Transacción: $transaccionId',
+              'Transacción: $transaccionId\n'
+              'ID Inscripción: $inscripcionId',
             ),
             backgroundColor: const Color(0xFF00D9D9),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 5),
           ),
         );
+
+        // Iniciar polling automático del estado
+        _iniciarPolling();
       } else {
         setState(() {
           loadingIndex = null;
-          groups[index].status = GroupStatus.error;
+          grupoSeleccionado.status = GroupStatus.error;
           status = "❌ Error: ${response.statusCode}";
         });
 
@@ -204,7 +260,7 @@ class _CourseGroupsScreenState extends State<CourseGroupsScreen> {
     } catch (e) {
       setState(() {
         loadingIndex = null;
-        groups[index].status = GroupStatus.error;
+        grupoSeleccionado.status = GroupStatus.error;
         status = "❌ Error en la conexión: $e";
       });
 
@@ -220,39 +276,191 @@ class _CourseGroupsScreenState extends State<CourseGroupsScreen> {
       );
     }
   }
+
+  // Método para consultar el estado de la inscripción
+  Future<void> _consultarEstado() async {
+    if (inscripcionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay inscripción para consultar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // URL con el formato correcto: /registro/inscripcionId
+      final url = Uri.parse(
+        //"http://192.168.0.184:5000/api/inscripciones/estado-inscripcion/20251234/$inscripcionId",
+        "http://172.20.10.6:5000/api/inscripciones/estado-inscripcion/20251234/$inscripcionId",
+      );
+
+      debugPrint("🔍 Consultando estado para inscripción $inscripcionId");
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final estado = data["estado"];
+        final materias = data["materias"] as List;
+
+        debugPrint("📡 Estado recibido: $estado");
+
+        // Obtener información adicional de las materias
+        String materiasInfo = materias
+            .map((m) => '${m["codigo"]} (${m["grupo"]}): ${m["estado"]}')
+            .join('\n');
+
+        // Determinar el nuevo estado del grupo
+        GroupStatus nuevoEstado = GroupStatus.pending;
+
+        if (estado == "CONFIRMADA" ||
+            estado == "COMPLETADO" ||
+            estado == "ACEPTADA" ||
+            estado == "EXITOSO") {
+          nuevoEstado = GroupStatus.success;
+          debugPrint("✅ Cambiando a estado SUCCESS");
+        } else if (estado == "RECHAZADA" ||
+            estado == "ERROR" ||
+            estado == "FALLIDO") {
+          nuevoEstado = GroupStatus.error;
+          debugPrint("❌ Cambiando a estado ERROR");
+        } else if (estado == "PENDIENTE") {
+          nuevoEstado = GroupStatus.pending;
+          debugPrint("⏳ Mantiene estado PENDING");
+        }
+
+        setState(() {
+          status = "📡 Estado: $estado\n$materiasInfo";
+
+          // Actualizar el estado del grupo que estaba pendiente
+          final index = grupos.indexWhere(
+            (g) => g.status == GroupStatus.pending,
+          );
+          if (index != -1) {
+            grupos[index].status = nuevoEstado;
+            debugPrint("🔄 Grupo en index $index actualizado a $nuevoEstado");
+          }
+        });
+
+        // Mostrar notificación con el estado
+        Color snackbarColor;
+        String emoji;
+
+        if (estado == "CONFIRMADA" ||
+            estado == "COMPLETADO" ||
+            estado == "ACEPTADA" ||
+            estado == "EXITOSO") {
+          snackbarColor = Colors.green;
+          emoji = '✅';
+        } else if (estado == "RECHAZADA" ||
+            estado == "ERROR" ||
+            estado == "FALLIDO") {
+          snackbarColor = Colors.red;
+          emoji = '❌';
+        } else if (estado == "PENDIENTE") {
+          snackbarColor = Colors.orange;
+          emoji = '⏳';
+        } else {
+          snackbarColor = const Color(0xFF00D9D9);
+          emoji = '📡';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$emoji Estado: $estado\n$materiasInfo'),
+            backgroundColor: snackbarColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else {
+        throw Exception('Error al consultar estado: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint("❌ Error al consultar estado: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al consultar estado: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  // Polling automático cada 3 segundos
+  void _iniciarPolling() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && inscripcionId != null) {
+        // Verificar si hay grupos pendientes antes de continuar
+        final tienePendiente = grupos.any(
+          (g) => g.status == GroupStatus.pending,
+        );
+        if (tienePendiente) {
+          _consultarEstado().then((_) {
+            // Después de consultar, verificar nuevamente si debe continuar
+            final sigueHabiendoPendiente = grupos.any(
+              (g) => g.status == GroupStatus.pending,
+            );
+            if (sigueHabiendoPendiente) {
+              _iniciarPolling();
+            } else {
+              debugPrint("Polling detenido: estado final alcanzado");
+            }
+          });
+        } else {
+          debugPrint("Polling detenido: no hay inscripciones pendientes");
+        }
+      }
+    });
+  }
 }
 
 enum GroupStatus { available, full, pending, success, error }
 
-class CourseGroup {
-  final String groupNumber;
-  final String schedule;
-  final String professor;
-  final int totalQuota;
-  int enrolledStudents;
+class GrupoMateriaConStatus {
+  final GrupoMateria grupoMateria;
   GroupStatus status;
 
-  CourseGroup({
-    required this.groupNumber,
-    required this.schedule,
-    required this.professor,
-    required this.totalQuota,
-    required this.enrolledStudents,
-    required this.status,
+  GrupoMateriaConStatus({
+    required this.grupoMateria,
+    this.status = GroupStatus.available,
   });
 
-  int get availableSpots => totalQuota - enrolledStudents;
-  String get quota => '$enrolledStudents/$totalQuota';
+  int get id => grupoMateria.id;
+  String get grupo => grupoMateria.grupo;
+  int get cupo => grupoMateria.cupo;
+  String get estado => grupoMateria.estado;
+  String get docenteNombre => grupoMateria.docenteNombre;
+  String? get docenteRegistro => grupoMateria.docenteRegistro;
+  String? get horarioDia => grupoMateria.horarioDia;
+  String? get horaInicio => grupoMateria.horaInicio;
+  String? get horaFin => grupoMateria.horaFin;
+
+  String get horarioCompleto {
+    if (horarioDia != null && horaInicio != null && horaFin != null) {
+      return '$horarioDia $horaInicio-$horaFin';
+    }
+    return 'Horario no disponible';
+  }
 }
 
 class CourseGroupCard extends StatelessWidget {
-  final CourseGroup group;
+  final GrupoMateriaConStatus grupo;
   final bool isLoading;
   final VoidCallback onEnroll;
 
   const CourseGroupCard({
     Key? key,
-    required this.group,
+    required this.grupo,
     required this.isLoading,
     required this.onEnroll,
   }) : super(key: key);
@@ -274,7 +482,7 @@ class CourseGroupCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Grupo ${group.groupNumber}',
+                  'Grupo ${grupo.grupo}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -285,57 +493,63 @@ class CourseGroupCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildInfoRow(Icons.schedule, 'Horario: ${group.schedule}'),
+            _buildInfoRow(Icons.schedule, 'Horario: ${grupo.horarioCompleto}'),
             const SizedBox(height: 8),
-            _buildInfoRow(Icons.person, 'Profesor: ${group.professor}'),
+            _buildInfoRow(Icons.person, 'Docente: ${grupo.docenteNombre}'),
             const SizedBox(height: 8),
-            _buildInfoRow(Icons.people, 'Cupos: ${group.quota}'),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed:
-                    (group.status == GroupStatus.available && !isLoading)
-                        ? onEnroll
-                        : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      group.status == GroupStatus.available
-                          ? const Color.fromARGB(255, 0, 71, 255)
-                          : const Color(0xFF3A3A4E),
-                  foregroundColor:
-                      group.status == GroupStatus.available
-                          ? const Color(0xFF1E1E2E)
-                          : const Color(0xFF8B8B9E),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+            _buildInfoRow(Icons.people, 'Cupos: ${grupo.cupo}'),
+            if (grupo.status == GroupStatus.available ||
+                grupo.status == GroupStatus.full) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed:
+                      (grupo.status == GroupStatus.available && !isLoading)
+                          ? onEnroll
+                          : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        grupo.status == GroupStatus.available
+                            ? const Color.fromARGB(255, 0, 71, 255)
+                            : const Color(0xFF3A3A4E),
+                    foregroundColor:
+                        grupo.status == GroupStatus.available
+                            ? Colors.white
+                            : const Color(0xFF8B8B9E),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 0,
                   ),
-                  elevation: 0,
+                  child:
+                      isLoading
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : Text(
+                            grupo.status == GroupStatus.available
+                                ? 'Inscribir (${grupo.cupo} cupos)'
+                                : 'Cupos llenos',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                 ),
-                child:
-                    isLoading
-                        ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF1E1E2E),
-                          ),
-                        )
-                        : Text(
-                          group.status == GroupStatus.available
-                              ? 'Inscribir (${group.availableSpots} cupos)'
-                              : 'Cupos llenos',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
               ),
-            ),
+            ] else
+              const SizedBox(
+                height: 8,
+              ), // Espacio para mantener la altura de la tarjeta
           ],
         ),
       ),
@@ -362,7 +576,7 @@ class CourseGroupCard extends StatelessWidget {
     Color textColor;
     String text;
 
-    switch (group.status) {
+    switch (grupo.status) {
       case GroupStatus.available:
         backgroundColor = const Color(0xFF1F3A2F);
         textColor = const Color(0xFF4ADE80);
@@ -386,7 +600,7 @@ class CourseGroupCard extends StatelessWidget {
       case GroupStatus.error:
         backgroundColor = const Color(0xFF3A1F1F);
         textColor = const Color(0xFFFF6B6B);
-        text = '❌ Error';
+        text = '❌ Cancelado';
         break;
     }
 
