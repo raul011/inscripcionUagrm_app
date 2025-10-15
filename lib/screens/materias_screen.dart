@@ -5,7 +5,6 @@ import 'grupo_materias_screen.dart';
 import '../services/session_service.dart';
 import 'login_screen2.dart';
 import 'perfil_estudiante_screen.dart';
-import 'materias-agregadas_screen.dart';
 
 class MateriasScreen extends StatefulWidget {
   const MateriasScreen({super.key});
@@ -60,18 +59,6 @@ class _MateriasScreenState extends State<MateriasScreen> {
                     (Route<dynamic> route) => false,
                   );
                 }
-              } else if (value == 'materias') {
-                // Borrar la sesión
-
-                // Navegar a la pantalla de login y eliminar el historial de rutas
-                if (mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const MateriasAgregadasScreen(),
-                    ),
-                    (Route<dynamic> route) => false,
-                  );
-                }
               }
             },
             itemBuilder:
@@ -88,13 +75,6 @@ class _MateriasScreenState extends State<MateriasScreen> {
                     child: ListTile(
                       leading: Icon(Icons.logout),
                       title: Text('Cerrar Sesión'),
-                    ),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: 'materias',
-                    child: ListTile(
-                      leading: Icon(Icons.logout),
-                      title: Text('materias agregadas'),
                     ),
                   ),
                 ],

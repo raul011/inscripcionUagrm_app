@@ -292,8 +292,8 @@ class _CourseGroupsScreenState extends State<CourseGroupsScreen> {
     try {
       // URL con el formato correcto: /registro/inscripcionId
       final url = Uri.parse(
-        //"http://192.168.0.184:5000/api/inscripciones/estado-inscripcion/20251234/$inscripcionId",
-        "http://172.20.10.6:5000/api/inscripciones/estado-inscripcion/20251234/$inscripcionId",
+        "http://192.168.0.184:5000/api/inscripciones/estado-inscripcion/20251234/$inscripcionId",
+        // "http://172.20.10.6:5000/api/inscripciones/estado-inscripcion/20251234/$inscripcionId",
       );
 
       debugPrint("🔍 Consultando estado para inscripción $inscripcionId");

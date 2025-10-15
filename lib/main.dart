@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
-import 'package:inscripcion_app/screens/login_screen.dart';
 import 'package:inscripcion_app/screens/login_screen2.dart';
 import 'package:inscripcion_app/screens/grupo_materias_screen.dart';
 import 'package:inscripcion_app/screens/materias_screen.dart';

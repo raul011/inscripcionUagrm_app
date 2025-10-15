@@ -18,8 +18,8 @@ class ApiService {
   // Constructor
   //ApiService({this.baseUrl = 'http://10.0.2.2:8000/api'});
   //ApiService({this.baseUrl = 'http://3.129.13.240:8000/api'});
-  ApiService({this.baseUrl = 'http://172.20.10.6:5000/api'});
-  //ApiService({this.baseUrl = 'http://192.168.0.184:5000/api'});
+  //ApiService({this.baseUrl = 'http://172.20.10.6:5000/api'});
+  ApiService({this.baseUrl = 'http://192.168.0.184:5000/api'});
 
   static const Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
@@ -42,8 +42,8 @@ class ApiService {
   }
 
   static Future<List<Materia>> fetchMaterias({int page = 1}) async {
-    //  final url = Uri.parse("http://192.168.0.184:5000/api/materias?page=$page");
-    final url = Uri.parse("http://172.20.10.6:5000/api/materias?page=$page");
+    final url = Uri.parse("http://192.168.0.184:5000/api/materias?page=$page");
+    // final url = Uri.parse("http://172.20.10.6:5000/api/materias?page=$page");
     // ⚠️ Usa 10.0.2.2 si estás en emulador Android, o la IP local de tu PC si usas dispositivo físico
 
     final response = await http.get(url);
